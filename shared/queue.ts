@@ -20,7 +20,10 @@ export async function get(storyId: string): Promise<PromptPackage | null> {
 export async function update(
   storyId: string,
   patch: Partial<
-    Pick<PromptPackage, 'status' | 'image_url' | 'video_url' | 'output_url'>
+    Pick<
+      PromptPackage,
+      'status' | 'image_url' | 'video_url' | 'output_url' | 'video_task_id'
+    >
   >,
 ): Promise<PromptPackage> {
   const current = await get(storyId);

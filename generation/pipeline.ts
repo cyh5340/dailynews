@@ -14,14 +14,26 @@ function toDataUrl(buffer: Buffer, mime = 'image/png'): string {
 async function processPending(pkg: PromptPackage): Promise<PromptPackage> {
   const image = await generateImage(pkg);
   const captioned = await addCaptions(image.buffer, pkg);
-  const imageUrl = await uploadToBlob(pkg.story_id, 'image', captioned, 'image/png');
+  const imageUrl = await uploadToBlob(
+    pkg.story_id,
+    'image',
+    captioned,
+    'image/png',
+    pkg.image_url || undefined,
+  );
   return queue.update(pkg.story_id, { status: 'image_done', image_url: imageUrl });
 }
 
 async function processImageDone(pkg: PromptPackage): Promise<PromptPackage> {
   const sourceUrl = pkg.image_url || toDataUrl(await fetchImageBuffer(pkg));
   const video = await generateVideo(pkg, sourceUrl);
-  const videoUrl = await uploadToBlob(pkg.story_id, 'video', video.buffer, 'video/mp4');
+  const videoUrl = await uploadToBlob(
+    pkg.story_id,
+    'video',
+    video.buffer,
+    'video/mp4',
+    pkg.video_url || undefined,
+  );
   return queue.update(pkg.story_id, { status: 'video_done', video_url: videoUrl });
 }
 
@@ -40,7 +52,7 @@ async function processVideoDone(pkg: PromptPackage): Promise<PromptPackage> {
   const silentVideo = Buffer.from(await res.arrayBuffer());
 
   const finalBuffer = await mergeVoiceover(silentVideo, pkg);
-  const outputUrl = await publishFinal(pkg, finalBuffer);
+  const outputUrl = await publishFinal(pkg, finalBuffer, pkg.output_url || undefined);
   return queue.update(pkg.story_id, {
     status: 'published',
     output_url: outputUrl,

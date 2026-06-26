@@ -1,6 +1,7 @@
 import { guardPaidCall, recordCost } from '../shared/cost_tracker';
 import { logStage } from '../shared/log';
 import { downloadFile, minimaxFetch } from '../shared/minimax';
+import * as queue from '../shared/queue';
 import type { PromptPackage } from '../shared/types';
 
 interface VideoTaskResponse {
@@ -24,6 +25,62 @@ export interface VideoGenResult {
   costUsd: number;
 }
 
+async function pollVideoTask(
+  pkg: PromptPackage,
+  taskId: string,
+  started: number,
+  costUsd: number,
+): Promise<Buffer> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  let fileId: string | undefined;
+
+  while (Date.now() < deadline) {
+    try {
+      const query = await minimaxFetch<VideoQueryResponse>(
+        `/v1/query/video_generation?task_id=${encodeURIComponent(taskId)}`,
+      );
+
+      if (query.status === 'Success') {
+        fileId = query.file_id;
+        break;
+      }
+      if (query.status === 'Fail') {
+        await queue.update(pkg.story_id, { video_task_id: '' });
+        throw new Error('MiniMax video generation failed');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'MiniMax video generation failed') {
+        throw error;
+      }
+      console.warn(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          stage: 'video_gen_poll',
+          story_id: pkg.story_id,
+          detail: error instanceof Error ? error.message : 'unknown_error',
+        }),
+      );
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+
+  if (!fileId) throw new Error('MiniMax video generation timed out');
+
+  const buffer = await downloadFile(fileId);
+  await recordCost('minimax_video_6s', costUsd);
+  await queue.update(pkg.story_id, { video_task_id: '' });
+
+  logStage({
+    stage: 'video_gen',
+    story_id: pkg.story_id,
+    ms: Date.now() - started,
+    cost_usd: costUsd,
+    status: 'ok',
+  });
+
+  return buffer;
+}
+
 export async function generateVideo(
   pkg: PromptPackage,
   imageUrl: string,
@@ -43,65 +100,27 @@ export async function generateVideo(
   }
 
   try {
-    const task = await minimaxFetch<VideoTaskResponse>('/v1/video_generation', {
-      method: 'POST',
-      body: JSON.stringify({
-        model: 'MiniMax-Hailuo-2.3-Fast',
-        first_frame_image: imageUrl,
-        prompt: pkg.motion_prompt,
-        duration: 6,
-        resolution: '768P',
-        prompt_optimizer: true,
-      }),
-    });
+    let taskId = pkg.video_task_id;
 
-    if (!task.task_id) throw new Error('MiniMax video task_id missing');
+    if (!taskId) {
+      const task = await minimaxFetch<VideoTaskResponse>('/v1/video_generation', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: 'MiniMax-Hailuo-2.3-Fast',
+          first_frame_image: imageUrl,
+          prompt: pkg.motion_prompt,
+          duration: 6,
+          resolution: '768P',
+          prompt_optimizer: true,
+        }),
+      });
 
-    const deadline = Date.now() + POLL_TIMEOUT_MS;
-    let fileId: string | undefined;
-
-    while (Date.now() < deadline) {
-      try {
-        const query = await minimaxFetch<VideoQueryResponse>(
-          `/v1/query/video_generation?task_id=${encodeURIComponent(task.task_id)}`,
-        );
-
-        if (query.status === 'Success') {
-          fileId = query.file_id;
-          break;
-        }
-        if (query.status === 'Fail') {
-          throw new Error('MiniMax video generation failed');
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message === 'MiniMax video generation failed') {
-          throw error;
-        }
-        console.warn(
-          JSON.stringify({
-            ts: new Date().toISOString(),
-            stage: 'video_gen_poll',
-            story_id: pkg.story_id,
-            detail: error instanceof Error ? error.message : 'unknown_error',
-          }),
-        );
-      }
-      await sleep(POLL_INTERVAL_MS);
+      if (!task.task_id) throw new Error('MiniMax video task_id missing');
+      taskId = task.task_id;
+      await queue.update(pkg.story_id, { video_task_id: taskId });
     }
 
-    if (!fileId) throw new Error('MiniMax video generation timed out');
-
-    const buffer = await downloadFile(fileId);
-    await recordCost('minimax_video_6s', guard.estimate);
-
-    logStage({
-      stage: 'video_gen',
-      story_id: pkg.story_id,
-      ms: Date.now() - started,
-      cost_usd: guard.estimate,
-      status: 'ok',
-    });
-
+    const buffer = await pollVideoTask(pkg, taskId, started, guard.estimate);
     return { buffer, costUsd: guard.estimate };
   } catch (error) {
     logStage({

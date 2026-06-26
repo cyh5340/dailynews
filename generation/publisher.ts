@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { head, list, put } from '@vercel/blob';
 import { guardPaidCall, getDailySpend, recordCost } from '../shared/cost_tracker';
 import { logStage } from '../shared/log';
 import type { PromptPackage } from '../shared/types';
@@ -20,34 +20,69 @@ export interface DailySummary {
   items: PublishSummaryItem[];
 }
 
-export async function uploadToBlob(
+function blobPathname(
   storyId: string,
   kind: 'image' | 'video' | 'final',
-  buffer: Buffer,
   contentType: string,
-): Promise<string> {
-  const guard = await guardPaidCall('blob_upload');
-  if (!guard.allowed) throw new Error('Daily budget exceeded before blob upload');
-
+): string {
   const ext = contentType.includes('png')
     ? 'png'
     : contentType.includes('jpeg')
       ? 'jpg'
       : 'mp4';
+  return `dailynews/${storyId}/${kind}.${ext}`;
+}
 
-  const blob = await put(`dailynews/${storyId}/${kind}.${ext}`, buffer, {
-    access: 'public',
-    contentType,
-    addRandomSuffix: false,
-  });
+async function findExistingBlobUrl(pathname: string): Promise<string | null> {
+  const prefix = pathname.slice(0, pathname.lastIndexOf('/') + 1);
+  const { blobs } = await list({ prefix, limit: 20 });
+  const match = blobs.find((blob) => blob.pathname === pathname);
+  return match?.url ?? null;
+}
 
-  await recordCost('blob_upload', guard.estimate);
-  return blob.url;
+export async function uploadToBlob(
+  storyId: string,
+  kind: 'image' | 'video' | 'final',
+  buffer: Buffer,
+  contentType: string,
+  existingUrl?: string,
+): Promise<string> {
+  const guard = await guardPaidCall('blob_upload');
+  if (!guard.allowed) throw new Error('Daily budget exceeded before blob upload');
+
+  const pathname = blobPathname(storyId, kind, contentType);
+
+  if (existingUrl) {
+    try {
+      const meta = await head(existingUrl);
+      if (meta.pathname === pathname) return existingUrl;
+    } catch {
+      // fall through and re-upload or resolve by pathname
+    }
+  }
+
+  const cached = await findExistingBlobUrl(pathname);
+  if (cached) return cached;
+
+  try {
+    const blob = await put(pathname, buffer, {
+      access: 'public',
+      contentType,
+      addRandomSuffix: false,
+    });
+    await recordCost('blob_upload', guard.estimate);
+    return blob.url;
+  } catch (error) {
+    const recovered = await findExistingBlobUrl(pathname);
+    if (recovered) return recovered;
+    throw error;
+  }
 }
 
 export async function publishFinal(
   pkg: PromptPackage,
   finalBuffer: Buffer,
+  existingUrl?: string,
 ): Promise<string> {
   const started = Date.now();
   try {
@@ -56,6 +91,7 @@ export async function publishFinal(
       'final',
       finalBuffer,
       'video/mp4',
+      existingUrl,
     );
 
     logStage({
