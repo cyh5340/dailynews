@@ -61,16 +61,30 @@ export async function generateVideo(
     let fileId: string | undefined;
 
     while (Date.now() < deadline) {
-      const query = await minimaxFetch<VideoQueryResponse>(
-        `/v1/query/video_generation?task_id=${encodeURIComponent(task.task_id)}`,
-      );
+      try {
+        const query = await minimaxFetch<VideoQueryResponse>(
+          `/v1/query/video_generation?task_id=${encodeURIComponent(task.task_id)}`,
+        );
 
-      if (query.status === 'Success') {
-        fileId = query.file_id;
-        break;
-      }
-      if (query.status === 'Fail') {
-        throw new Error('MiniMax video generation failed');
+        if (query.status === 'Success') {
+          fileId = query.file_id;
+          break;
+        }
+        if (query.status === 'Fail') {
+          throw new Error('MiniMax video generation failed');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === 'MiniMax video generation failed') {
+          throw error;
+        }
+        console.warn(
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            stage: 'video_gen_poll',
+            story_id: pkg.story_id,
+            detail: error instanceof Error ? error.message : 'unknown_error',
+          }),
+        );
       }
       await sleep(POLL_INTERVAL_MS);
     }

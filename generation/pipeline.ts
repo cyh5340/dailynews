@@ -60,9 +60,13 @@ export async function processStory(storyId: string): Promise<PublishSummaryItem>
   }
 
   try {
-    if (pkg.status === 'pending') pkg = await processPending(pkg);
-    if (pkg.status === 'image_done') pkg = await processImageDone(pkg);
-    if (pkg.status === 'video_done') pkg = await processVideoDone(pkg);
+    if (pkg.status === 'pending') {
+      pkg = await processPending(pkg);
+    } else if (pkg.status === 'image_done') {
+      pkg = await processImageDone(pkg);
+    } else if (pkg.status === 'video_done') {
+      pkg = await processVideoDone(pkg);
+    }
 
     return {
       story_id: pkg.story_id,

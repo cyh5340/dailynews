@@ -107,8 +107,16 @@ export async function addCaptions(
     let output = await renderWithFontSize(imageBuffer, pkg, fontSize);
 
     while (fontSize > 28) {
-      const meta = await sharp(output).metadata();
-      if ((meta.width ?? 0) <= 2048) break;
+      const meta = await sharp(imageBuffer).metadata();
+      const width = meta.width ?? 1024;
+      const height = meta.height ?? 1024;
+      const maxChars = Math.max(12, Math.floor(width / (fontSize * 0.55)));
+      const topLines = wrapText(pkg.caption_top, maxChars);
+      const bottomLines = wrapText(pkg.caption_bottom, maxChars);
+      const totalHeight = (topLines.length + bottomLines.length) * (fontSize + 8);
+
+      if (totalHeight <= height * 0.4) break;
+
       fontSize -= 6;
       output = await renderWithFontSize(imageBuffer, pkg, fontSize);
     }

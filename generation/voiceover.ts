@@ -93,6 +93,8 @@ export async function mergeVoiceover(
 
     await runFfmpeg([
       '-y',
+      '-stream_loop',
+      '-1',
       '-i',
       videoPath,
       '-i',
