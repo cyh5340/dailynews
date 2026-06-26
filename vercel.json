@@ -1,10 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     { "path": "/api/run-a", "schedule": "0 6 * * *" },
     { "path": "/api/run-b", "schedule": "30 6 * * *" }
   ],
   "functions": {
-    "api/run-a.ts": { "maxDuration": 300 },
-    "api/run-b.ts": { "maxDuration": 300 }
+    "api/run-a.ts": { "maxDuration": 300, "memory": 3009 },
+    "api/run-b.ts": { "maxDuration": 300, "memory": 3009 }
   }
 }

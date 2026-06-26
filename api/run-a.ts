@@ -63,7 +63,8 @@ export async function GET(): Promise<Response> {
 }
 
 // Local CLI
-const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+const scriptPath = process.argv[1]?.replace(/\\/g, '/');
+const isDirectRun = scriptPath?.endsWith('api/run-a.ts') || scriptPath?.endsWith('run-a.ts');
 if (isDirectRun) {
   runPersonA(process.argv.includes('--dry')).catch((err) => {
     console.error('Fatal:', err);
