@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx pipeline.ts"
+    "start": "tsx pipeline.ts",
+    "run-a": "tsx api/run-a.ts",
+    "run-a:dry": "tsx api/run-a.ts --dry"
   },
   "dependencies": {
+    "@vercel/kv": "^3.0.0",
     "dotenv": "^16.4.5",
     "ffmpeg-static": "^5.2.0",
+    "rss-parser": "^3.13.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {

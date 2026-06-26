@@ -1,5 +1,4 @@
 // ⬜ Shared — PromptPackage / Status types (interface contract). See DESIGN.md §6.
-// TODO: implement
 
 export type Tone = 'absurd' | 'political' | 'wholesome';
 
@@ -25,7 +24,18 @@ export interface PromptPackage {
 export interface RawStory {
   title: string;
   url: string;
-  source: string;
-  published_at: string;
+  source: string; // crawler source key: newsapi | google-news | reuters | gdelt
+  published_at: string; // ISO8601
   summary: string;
+}
+
+// 🟦 A — dedup output: a representative story with a computed relevance score.
+export type ScoredStory = RawStory & { relevance: number };
+
+// 🟦 A — strict JSON shape returned by the summarizer LLM call. See DESIGN.md §5.
+export interface SummaryResult {
+  punchline: string;
+  tone: Tone;
+  entities: string[];
+  meme_score: number; // 1..10
 }
