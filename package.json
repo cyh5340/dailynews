@@ -1,19 +1,26 @@
 {
-  "name": "meme-video-agent-v0",
-  "version": "0.0.0",
+  "name": "dailynews",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "description": "Daily automated meme video pipeline",
   "scripts": {
-    "start": "tsx pipeline.ts"
+    "start": "tsx pipeline.ts",
+    "typecheck": "tsc --noEmit",
+    "dev": "vercel dev",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@vercel/blob": "^0.27.3",
+    "@vercel/functions": "^2.0.0",
+    "@vercel/kv": "^3.0.0",
     "dotenv": "^16.4.5",
     "ffmpeg-static": "^5.2.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
-    "@types/node": "^22.7.4",
+    "@types/node": "^22.13.10",
+    "@vercel/node": "^5.1.8",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "typescript": "^5.8.2"
   }
 }

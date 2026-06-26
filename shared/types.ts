@@ -1,5 +1,4 @@
 // ⬜ Shared — PromptPackage / Status types (interface contract). See DESIGN.md §6.
-// TODO: implement
 
 export type Tone = 'absurd' | 'political' | 'wholesome';
 
@@ -19,6 +18,7 @@ export interface PromptPackage {
   image_url: string; // 🟥 B — Vercel Blob URL
   video_url: string; // 🟥 B — Vercel Blob URL
   output_url: string; // 🟥 B — final published URL
+  video_task_id?: string; // 🟥 B — in-flight Hailuo task for resume
   created_at: string; // 🟦 A — ISO8601
 }
 
